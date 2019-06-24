@@ -11,32 +11,41 @@
 // allows the population to equilibrate over 10 generations,
 // and then drops DROP_SIZE transgenic individuals into the population.
 
-// The following header to be replaced via python,
-// such that these values can be varied across multiple runs of slim.
 initialize() {
-        defineConstant("DRIVE_FITNESS_VALUE", 0.9);
-        defineConstant("DROP_SIZE", 100);
-        defineConstant("EMBRYO_RESISTANCE_RATE", 0.05);
-        defineConstant("GERMLINE_RESISTANCE_RATE", 0.02);
-        defineConstant("NUM_GRNAS", 4);
-        defineConstant("NUM_CUT_PHASES", 3);
-        defineConstant("HAPLOLETHAL", F);
-        defineConstant("HAPLOSUFFICIENT", F);
-        defineConstant("HOMING_DRIVE", T);
-        defineConstant("GENE_UTILITY_TRANSFORMATION_DRIVE", F);
-        defineConstant("GENE_UTILITY_TRANSFORMATION_FITNESS", 0.95);
-        defineConstant("RECESSIVE_FEMALE_STERILE_SUPPRESSION_DRIVE", F);
-        defineConstant("HAPLOLETHAL_SUPPRESSION_DRIVE", F);
-        defineConstant("X_LINKED_DRIVE", F);
-        defineConstant("MALE_ONLY_PROMOTER", F);
-        defineConstant("MALE_ONLY_DROP", F);
-        defineConstant("FEMALE_ONLY_DROP", F);
-        defineConstant("HETEROZYGOUS_DROP", T);
-        defineConstant("CAPACITY", 10000);
-        defineConstant("HOMING_PHASE_CUT_RATE", 0.99);
-        defineConstant("R1_OCCURRENCE_RATE", 0.1);
-        defineConstant("R2_FITNESS_VALUE", 0.95);
-    // */    // End header.
+    // Configuration parameters:
+    defineConstant("DRIVE_FITNESS_VALUE", 0.9);
+    defineConstant("R2_FITNESS_VALUE", 0.95);
+    defineConstant("GENE_DISRUPTION_DRIVE_FITNESS_MULTIPLIER", 0.95);
+
+    defineConstant("GERMLINE_RESISTANCE_CUT_RATE", 0.02);
+    defineConstant("HOMING_PHASE_CUT_RATE", 0.99);
+    defineConstant("EMBRYO_RESISTANCE_CUT_RATE", 0.05);
+    defineConstant("R1_OCCURRENCE_RATE", 0.1);
+
+    defineConstant("NUM_GRNAS", 4);
+    defineConstant("NUM_CUT_PHASES", 3);
+
+    defineConstant("HOMING_DRIVE", T);
+    defineConstant("HAPLOLETHAL", F);
+    defineConstant("RECESSIVE_LETHAL", F);
+    defineConstant("GENE_DISRUPTION_DRIVE", F);
+    defineConstant("RECESSIVE_FEMALE_STERILE_SUPPRESSION_DRIVE", F);
+    defineConstant("HAPLOLETHAL_SUPPRESSION_DRIVE", F);
+
+    defineConstant("X_LINKED_DRIVE", F);
+    defineConstant("MALE_ONLY_PROMOTER", F);
+
+    defineConstant("MALE_ONLY_DROP", F);
+    defineConstant("FEMALE_ONLY_DROP", F);
+    defineConstant("HETEROZYGOUS_DROP", T);
+
+    defineConstant("CAPACITY", 100000);
+    defineConstant("DROP_SIZE", 100);
+
+    // End config params.
+
+
+
 
     // For mortality rate as a function of age:
     // Some females are allowed to survive two generations:
@@ -130,7 +139,7 @@ function (void)germline(o<Genome>$ child_chromosome, o<Individual>$ parent, f$ r
     for (i in seqAlong(wt_loci)) {
         // Check to see if cas9 cuts...
         if (runif(1) < HOMING_PHASE_CUT_RATE) {
-            if (runif(1) < GERMLINE_RESISTANCE_RATE) {
+            if (runif(1) < resistance_rate) {
                 // Resistance forms:
                 addResistanceAllele(child_chromosome, wt_loci[i]);
             }
@@ -144,7 +153,7 @@ function (void)germline(o<Genome>$ child_chromosome, o<Individual>$ parent, f$ r
     }
 }
 
-//// FUNCTION FOR CAS9 EFFECTS IN EMBRYO.
+//// FUNCTION FOR CAS9 EFFECTS IN THE EMBRYO.
 function (void)embryo(o<Genome>$ child_chromosome_1, o<Genome>$ child_chromosome_2, o<Individual>$ mother) {
     // Determine presence of drive in this mother.
     // If mother doesn't have drive allele, nothing happens in embryo.
@@ -161,7 +170,7 @@ function (void)embryo(o<Genome>$ child_chromosome_1, o<Genome>$ child_chromosome
     // At each possible locus...
     for (i in seqAlong(wt_loci))
         // Check to see if cas9 cuts...
-        if (runif(1) < EMBRYO_RESISTANCE_RATE)
+        if (runif(1) < EMBRYO_RESISTANCE_CUT_RATE)
             addResistanceAllele(child_chromosome_1, wt_loci[i]);
 
     // Vector of possible loci for cas9 to cut in c2:
@@ -169,7 +178,7 @@ function (void)embryo(o<Genome>$ child_chromosome_1, o<Genome>$ child_chromosome
     // At each possible locus...
     for (i in seqAlong(wt_loci))
         // Check to see if cas9 cuts...
-        if (runif(1) < EMBRYO_RESISTANCE_RATE)
+        if (runif(1) < EMBRYO_RESISTANCE_CUT_RATE)
             addResistanceAllele(child_chromosome_2, wt_loci[i]);
 }
 
@@ -209,8 +218,8 @@ function (void)copy_genome(o<Genome>$ source, o<Genome>$ destination) {
     if (HOMING_DRIVE) {
         // Apply effects that happen in the germline.
         if (!MALE_ONLY_PROMOTER)
-            germline(childGenome1, parent1, GERMLINE_RESISTANCE_RATE);
-        germline(childGenome2, parent2, GERMLINE_RESISTANCE_RATE);
+            germline(childGenome1, parent1, GERMLINE_RESISTANCE_CUT_RATE);
+        germline(childGenome2, parent2, GERMLINE_RESISTANCE_CUT_RATE);
 
         // Apply effects that happen in the embryo.
         if (!MALE_ONLY_PROMOTER)
@@ -231,9 +240,9 @@ function (void)copy_genome(o<Genome>$ source, o<Genome>$ destination) {
     // Offspring not viable if r2 on either chromosome.
     if (HAPLOLETHAL & (res_2_c_1 | res_2_c_2))
         return F;
-    // If drive is haplosufficient:
+    // If drive is recessive lethal:
     // Offspring not viable if r2 on both chromosomes.
-    if (HAPLOSUFFICIENT & res_2_c_1 & res_2_c_2)
+    if (RECESSIVE_LETHAL & res_2_c_1 & res_2_c_2)
         return F;
 
     return T;
@@ -278,9 +287,9 @@ function (f$)genotypeFitness(o<Individual>$ ind) {
 
     // If the drive is a gene function targeting drive, two copies of either
     // the gene or r2 incur an associated fitness cost.
-    if (GENE_UTILITY_TRANSFORMATION_DRIVE)
+    if (GENE_DISRUPTION_DRIVE)
         if ((drive_on_1 | res2_on_1) & (drive_on_2 | res2_on_2))
-            return sqrt(c1_value * c2_value) - (1 - GENE_UTILITY_TRANSFORMATION_FITNESS);
+            return sqrt(c1_value * c2_value) - (1 - GENE_DISRUPTION_DRIVE_FITNESS_MULTIPLIER);
 
     // Return fitness for individual with this genotype.
     return sqrt(c1_value * c2_value);

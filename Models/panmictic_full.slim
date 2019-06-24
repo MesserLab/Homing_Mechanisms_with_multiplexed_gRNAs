@@ -11,50 +11,53 @@
 // allows the population to equilibrate over 10 generations,
 // and then drops DROP_SIZE transgenic individuals into the population.
 
-// The following header to be replaced via python,
-// such that these values can be varied across multiple runs of slim.
 initialize() {
-        defineConstant("DRIVE_FITNESS_VALUE", 0.9);
-        defineConstant("DROP_SIZE", 100);
-        defineConstant("EMBRYO_RESISTANCE_RATE", 0.05);
-        defineConstant("GERMLINE_RESISTANCE_RATE", 0.02);
-        defineConstant("LATE_GERMLINE_RESISTANCE_RATE", 0.90);
-        defineConstant("NUM_GRNAS", 4);
-        defineConstant("NUM_CUT_PHASES", 3);
-        defineConstant("HAPLOLETHAL", F);
-        defineConstant("HAPLOSUFFICIENT", F);
-        defineConstant("HOMING_DRIVE", T);
-        defineConstant("GENE_UTILITY_TRANSFORMATION_DRIVE", T);
-        defineConstant("GENE_UTILITY_TRANSFORMATION_FITNESS", 0.95);
-        defineConstant("RECESSIVE_FEMALE_STERILE_SUPPRESSION_DRIVE", F);
-        defineConstant("HAPLOLETHAL_SUPPRESSION_DRIVE", F);
-        defineConstant("TADS_MODIFICATION", F); // r2/r2 males are sterile; nonhoming.
-        defineConstant("TADS_AUTOSOMAL_SUPPRESSION", F); // r2/r2 males AND d/d males are sterile; nonhoming.
-        defineConstant("X_LINKED_DRIVE", F);
-        defineConstant("MALE_ONLY_PROMOTER", F);
-        defineConstant("MALE_ONLY_DROP", F);
-        defineConstant("FEMALE_ONLY_DROP", F);
-        defineConstant("HETEROZYGOUS_DROP", T);
-        defineConstant("GRNA_SATURATION_SIMULATED", T);
-        defineConstant("CAPACITY", 10000);
-        defineConstant("HOMING_PHASE_CUT_RATE", 0.98);
-        defineConstant("HOMING_EDGE_EFFECT", 0.055);
-        defineConstant("GRNA_ACTIVITY_LEVEL", 0.2);
-        defineConstant("GLOBAL_SATURATION_FACTOR", 1.5); // Has no effect when set to 2.
-        defineConstant("BASE_TOTAL_FAILURE_AVOIDANCE_RATE", 0.9);
-        defineConstant("TOTAL_FAILURE_PER_OFFSET_PENALTY", 0.1);
-        defineConstant("TOTAL_FAILURE_R1_RATE", 0.001);
-        defineConstant("R1_OCCURRENCE_RATE", 0.1);
-        defineConstant("R2_FITNESS_VALUE", 0.95);
-    // */    // End header.
+    // Configuration parameters:
+    defineConstant("DRIVE_FITNESS_VALUE", 0.9);
+    defineConstant("R2_FITNESS_VALUE", 0.95);
+    defineConstant("GENE_DISRUPTION_DRIVE_FITNESS_MULTIPLIER", 0.95);
 
-    // Below are other globals.
+    defineConstant("GERMLINE_RESISTANCE_CUT_RATE", 0.02);
+    defineConstant("HOMING_PHASE_CUT_RATE", 0.98);
     defineConstant("BASELINE_HOMING_SUCCESS_RATE", 0.95);
+    defineConstant("HOMING_EDGE_EFFECT", 0.055);
+    defineConstant("BASE_TOTAL_FAILURE_AVOIDANCE_RATE", 0.9);
+    defineConstant("TOTAL_FAILURE_PER_OFFSET_PENALTY", 0.1);
+    defineConstant("TOTAL_FAILURE_R1_RATE", 0.001);
+    defineConstant("LATE_GERMLINE_RESISTANCE_CUT_RATE", 0.90);
+    defineConstant("EMBRYO_RESISTANCE_CUT_RATE", 0.05);
+    defineConstant("NUM_GRNAS", 4);
+    defineConstant("NUM_CUT_PHASES", 3);
+    defineConstant("GRNA_ACTIVITY_VARIATION", 0.2);
+    defineConstant("GRNA_SATURATION_SIMULATED", T);
+    defineConstant("GLOBAL_SATURATION_FACTOR", 1.5); // Has no effect when set to 2.
+    defineConstant("R1_OCCURRENCE_RATE", 0.1);
+
+    defineConstant("HOMING_DRIVE", T);
+    defineConstant("HAPLOLETHAL", F);
+    defineConstant("RECESSIVE_LETHAL", F);
+    defineConstant("GENE_DISRUPTION_DRIVE", F);
+    defineConstant("RECESSIVE_FEMALE_STERILE_SUPPRESSION_DRIVE", F);
+    defineConstant("HAPLOLETHAL_SUPPRESSION_DRIVE", F);
+    defineConstant("TADS_MODIFICATION", F); // r2/r2 males are sterile; nonhoming.
+    defineConstant("TADS_AUTOSOMAL_SUPPRESSION", F); // r2/r2 males AND d/d males are sterile; nonhoming.
+
+    defineConstant("X_LINKED_DRIVE", F);
+    defineConstant("MALE_ONLY_PROMOTER", F);
+
+    defineConstant("MALE_ONLY_DROP", F);
+    defineConstant("FEMALE_ONLY_DROP", F);
+    defineConstant("HETEROZYGOUS_DROP", T);
+
+    defineConstant("CAPACITY", 100000);
+    defineConstant("DROP_SIZE", 100);
+
+    // End config params.
 
     if (NUM_GRNAS == 1)
         defineConstant("GRNA_ACTIVITY_STEP", 0);
     else
-        defineConstant("GRNA_ACTIVITY_STEP", (2 * GRNA_ACTIVITY_LEVEL)  / (NUM_GRNAS - 1));
+        defineConstant("GRNA_ACTIVITY_STEP", (2 * GRNA_ACTIVITY_VARIATION)  / (NUM_GRNAS - 1));
 
     // For mortality rate as a function of age, for runs with overlaping generations.
     // Some females are allowed to survive two generations:
@@ -151,13 +154,13 @@ function (void)germline(o<Genome>$ child_chromosome, o<Individual>$ parent, f$ r
     // This model allows for varying rates of cutting at each locus.
     // Therefore, the cut rate is a vector of rates.
     cas_factor = GLOBAL_SATURATION_FACTOR * grna_factor / (GLOBAL_SATURATION_FACTOR - 1 + grna_factor);
-    local_cas_factor = cas_factor * (1 + GRNA_ACTIVITY_LEVEL);
+    local_cas_factor = cas_factor * (1 + GRNA_ACTIVITY_VARIATION);
     local_cut_rate = 1 - (1 - resistance_rate)^(local_cas_factor / (NUM_CUT_PHASES * grna_factor));
     // The above cut rate is the first rate in the vector.
     cut_rates = local_cut_rate;
     // Now fill in the rest of the vector.
     for (i in seqLen(NUM_GRNAS - 1)) {
-        local_cas_factor = cas_factor * (1 + GRNA_ACTIVITY_LEVEL - (i + 1) * GRNA_ACTIVITY_STEP);
+        local_cas_factor = cas_factor * (1 + GRNA_ACTIVITY_VARIATION - (i + 1) * GRNA_ACTIVITY_STEP);
         local_cut_rate = 1 - (1 - resistance_rate)^(local_cas_factor / (NUM_CUT_PHASES * grna_factor));
         // Concatenate the previous vector with the next cut rate calculated:
         cut_rates = c(cut_rates, local_cut_rate);
@@ -186,13 +189,13 @@ function (void)embryo(o<Genome>$ child_chromosome_1, o<Genome>$ child_chromosome
     // This model allows for varying rates of cutting at each locus.
     // Therefore, the cut rate is a vector of rates.
     cas_factor = GLOBAL_SATURATION_FACTOR * grna_factor / (GLOBAL_SATURATION_FACTOR - 1 + grna_factor);
-    local_cas_factor = cas_factor * (1 + GRNA_ACTIVITY_LEVEL);
-    local_cut_rate = 1 - (1 - EMBRYO_RESISTANCE_RATE)^(mother_drive_count * local_cas_factor / (NUM_CUT_PHASES * grna_factor));
+    local_cas_factor = cas_factor * (1 + GRNA_ACTIVITY_VARIATION);
+    local_cut_rate = 1 - (1 - EMBRYO_RESISTANCE_CUT_RATE)^(mother_drive_count * local_cas_factor / (NUM_CUT_PHASES * grna_factor));
     cut_rates = local_cut_rate;
     // Now fill in the rest of the vector.
     for (i in seqLen(NUM_GRNAS - 1)) {
-        local_cas_factor = cas_factor * (1 + GRNA_ACTIVITY_LEVEL - (i + 1) * GRNA_ACTIVITY_STEP);
-        local_cut_rate = 1 - (1 - EMBRYO_RESISTANCE_RATE)^(mother_drive_count * local_cas_factor / (NUM_CUT_PHASES * grna_factor));
+        local_cas_factor = cas_factor * (1 + GRNA_ACTIVITY_VARIATION - (i + 1) * GRNA_ACTIVITY_STEP);
+        local_cut_rate = 1 - (1 - EMBRYO_RESISTANCE_CUT_RATE)^(mother_drive_count * local_cas_factor / (NUM_CUT_PHASES * grna_factor));
         // Concatenate the previous vector with the next cut rate calculated:
         cut_rates = c(cut_rates, local_cut_rate);
     }
@@ -267,12 +270,12 @@ function (void)hdr(o<Genome>$ chromosome, o<Individual>$ parent) {
     if (GRNA_SATURATION_SIMULATED)
         grna_factor = NUM_GRNAS;
     cas_factor = GLOBAL_SATURATION_FACTOR * grna_factor / (GLOBAL_SATURATION_FACTOR - 1 + grna_factor);
-    local_cas_factor = cas_factor * (1 + GRNA_ACTIVITY_LEVEL);
+    local_cas_factor = cas_factor * (1 + GRNA_ACTIVITY_VARIATION);
     local_cut_rate = 1 - (1 - HOMING_PHASE_CUT_RATE)^(local_cas_factor / grna_factor);
     cut_rates = local_cut_rate;
     // Now fill in the rest of the vector.
     for (i in seqLen(NUM_GRNAS - 1)) {
-        local_cas_factor = cas_factor * (1 + GRNA_ACTIVITY_LEVEL - (i + 1) * GRNA_ACTIVITY_STEP);
+        local_cas_factor = cas_factor * (1 + GRNA_ACTIVITY_VARIATION - (i + 1) * GRNA_ACTIVITY_STEP);
         local_cut_rate = 1 - (1 - HOMING_PHASE_CUT_RATE)^(local_cas_factor / grna_factor);
         // Concatenate the previous vector with the next cut rate calculated:
         cut_rates = c(cut_rates, local_cut_rate);
@@ -318,7 +321,7 @@ function (void)hdr(o<Genome>$ chromosome, o<Individual>$ parent) {
             if (runif(1) > total_failure_avoidance_rate) {
                 // Rarely, partial HDR results in a total R1 allele, though only in haplolethal or recessive lethal drives:
                 total_r1_rate = TOTAL_FAILURE_R1_RATE * (1 + adjusted_right_index - adjusted_left_index);
-                if (runif(1) < total_r1_rate & (HAPLOLETHAL | HAPLOSUFFICIENT))
+                if (runif(1) < total_r1_rate & (HAPLOLETHAL | RECESSIVE_LETHAL))
                     for (i in seqLen(NUM_GRNAS))
                         chromosome.addNewDrawnMutation(m3, i);
                 else
@@ -380,16 +383,16 @@ function (void)copy_genome(o<Genome>$ source, o<Genome>$ destination) {
         // Apply effects that happen in the germline.
         // First, resistance alleles form.
         if (!MALE_ONLY_PROMOTER)
-            germline(childGenome1, parent1, GERMLINE_RESISTANCE_RATE);
-        germline(childGenome2, parent2, GERMLINE_RESISTANCE_RATE);
+            germline(childGenome1, parent1, GERMLINE_RESISTANCE_CUT_RATE);
+        germline(childGenome2, parent2, GERMLINE_RESISTANCE_CUT_RATE);
         // Next, homology directed repair allows for homing to occur.
         if (!MALE_ONLY_PROMOTER)
             hdr(childGenome1, parent1);
         hdr(childGenome2, parent2);
         // Then additional resistance alleles form.
         if (!MALE_ONLY_PROMOTER)
-            germline(childGenome1, parent1, LATE_GERMLINE_RESISTANCE_RATE);
-        germline(childGenome2, parent2, LATE_GERMLINE_RESISTANCE_RATE);
+            germline(childGenome1, parent1, LATE_GERMLINE_RESISTANCE_CUT_RATE);
+        germline(childGenome2, parent2, LATE_GERMLINE_RESISTANCE_CUT_RATE);
 
         // Apply effects that happen in the embryo.
         if (!MALE_ONLY_PROMOTER)
@@ -399,8 +402,8 @@ function (void)copy_genome(o<Genome>$ source, o<Genome>$ destination) {
     if (TADS_MODIFICATION | TADS_AUTOSOMAL_SUPPRESSION) {
         // Apply germline resistance
         if (!MALE_ONLY_PROMOTER)
-            germline(childGenome1, parent1, GERMLINE_RESISTANCE_RATE);
-        germline(childGenome2, parent2, GERMLINE_RESISTANCE_RATE);
+            germline(childGenome1, parent1, GERMLINE_RESISTANCE_CUT_RATE);
+        germline(childGenome2, parent2, GERMLINE_RESISTANCE_CUT_RATE);
 
         // If the child inherited r2 from a d/(wt or r1wt or r1) father
         while (childGenome2.countOfMutationsOfType(m4) > 0
@@ -417,7 +420,7 @@ function (void)copy_genome(o<Genome>$ source, o<Genome>$ destination) {
                     copy_genome(parent2Genome2, childGenome2);
                 if (parent2Genome2.countOfMutationsOfType(m2) == NUM_GRNAS)
                     copy_genome(parent2Genome1, childGenome2);
-                germline(childGenome2, parent2, GERMLINE_RESISTANCE_RATE);
+                germline(childGenome2, parent2, GERMLINE_RESISTANCE_CUT_RATE);
             }
         } // End while loop
 
@@ -439,8 +442,8 @@ function (void)copy_genome(o<Genome>$ source, o<Genome>$ destination) {
     if (!HOMING_DRIVE & !TADS_MODIFICATION & !TADS_AUTOSOMAL_SUPPRESSION) {
         // Apply effects that happen in the germline.
         if (!MALE_ONLY_PROMOTER)
-            germline(childGenome1, parent1, GERMLINE_RESISTANCE_RATE);
-        germline(childGenome2, parent2, GERMLINE_RESISTANCE_RATE);
+            germline(childGenome1, parent1, GERMLINE_RESISTANCE_CUT_RATE);
+        germline(childGenome2, parent2, GERMLINE_RESISTANCE_CUT_RATE);
 
         // Apply effects that happen in the embryo.
         if (!MALE_ONLY_PROMOTER)
@@ -461,9 +464,9 @@ function (void)copy_genome(o<Genome>$ source, o<Genome>$ destination) {
     // Offspring not viable if r2 on either chromosome.
     if (HAPLOLETHAL & (res_2_c_1 | res_2_c_2))
         return F;
-    // If drive is haplosufficient:
+    // If drive is recessive lethal:
     // Offspring not viable if r2 on both chromosomes.
-    if (HAPLOSUFFICIENT & res_2_c_1 & res_2_c_2)
+    if (RECESSIVE_LETHAL & res_2_c_1 & res_2_c_2)
         return F;
 
     return T;
@@ -508,9 +511,9 @@ function (f$)genotypeFitness(o<Individual>$ ind) {
 
     // If the drive is a gene function targeting drive, two copies of either
     // the gene or r2 incur an associated fitness cost.
-    if (GENE_UTILITY_TRANSFORMATION_DRIVE)
+    if (GENE_DISRUPTION_DRIVE)
         if ((drive_on_1 | res2_on_1) & (drive_on_2 | res2_on_2))
-            return sqrt(c1_value * c2_value) - (1 - GENE_UTILITY_TRANSFORMATION_FITNESS);
+            return sqrt(c1_value * c2_value) - (1 - GENE_DISRUPTION_DRIVE_FITNESS_MULTIPLIER);
 
     // Return fitness for individual with this genotype.
     return sqrt(c1_value * c2_value);
