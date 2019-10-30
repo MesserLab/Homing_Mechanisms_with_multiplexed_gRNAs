@@ -1,46 +1,50 @@
 
-// Author: Sam Champer and Isabel Kim.
-// Created in association with Jackson Champer and the Messer lab.
+// Author: Sam Champer with contributions from Isabel Kim.
+// Created with Jackson Champer and the Messer lab.
 
 // A framework for simulating many different gene drives
 // with varying parameters, intended to be configured by
-// alterning the heading below, or by dynamically varying
-// values in the header using an associated Python file.
+// alterning the defineConstants below, or by dynamically
+// varying values in the header using an external Python file.
 
 // This version starts with two individuals:
 // one of whom is a heterozygous female,
 // and generates CAPACITY offspring.
 
+// Note that in this simplified version of the model, many of the parameters are not used.
+
 initialize() {
-    // Configuration parameters:
+    // Fitness parameters:
     defineConstant("DRIVE_FITNESS_VALUE", 0.9);
-    defineConstant("R2_FITNESS_VALUE", 0.95);
     defineConstant("GENE_DISRUPTION_DRIVE_FITNESS_MULTIPLIER", 0.95);
-
-    defineConstant("GERMLINE_RESISTANCE_CUT_RATE", 0.02);
-    defineConstant("HOMING_PHASE_CUT_RATE", 0.99);
-    defineConstant("EMBRYO_RESISTANCE_CUT_RATE", 0.05);
-    defineConstant("R1_OCCURRENCE_RATE", 0.1);
-
-    defineConstant("NUM_GRNAS", 4);
-    defineConstant("NUM_CUT_PHASES", 3);
-
+    defineConstant("R2_FITNESS_VALUE", 1.0);
+    
+    // Drive type:
     defineConstant("HOMING_DRIVE", T);
     defineConstant("HAPLOLETHAL", F);
     defineConstant("RECESSIVE_LETHAL", F);
     defineConstant("GENE_DISRUPTION_DRIVE", F);
     defineConstant("RECESSIVE_FEMALE_STERILE_SUPPRESSION_DRIVE", F);
     defineConstant("HAPLOLETHAL_SUPPRESSION_DRIVE", F);
+    
+    // Resistance parameters:
+    defineConstant("NUM_CUT_PHASES", 3);
+    defineConstant("GERMLINE_RESISTANCE_CUT_RATE", 0.02);
+    defineConstant("EMBRYO_RESISTANCE_CUT_RATE", 0.05);
+    defineConstant("R1_OCCURRENCE_RATE", 0.1);
 
+    // HDR parameters:
+    defineConstant("HOMING_PHASE_CUT_RATE", 0.99);
+
+    // General drive parameters:
+    defineConstant("NUM_GRNAS", 2);
     defineConstant("X_LINKED_DRIVE", F);
     defineConstant("MALE_ONLY_PROMOTER", F);
-
+    
+    // Ecology and drop parameters:
+    defineConstant("CAPACITY", 100000);
     defineConstant("MALE_ONLY_DROP", F);
     defineConstant("FEMALE_ONLY_DROP", F);
-
-    defineConstant("CAPACITY", 100000);
-
-    // End config params.
 
     // This simulation will use a non-Wright-Fisher model.
     initializeSLiMModelType("nonWF");
@@ -70,33 +74,6 @@ initialize() {
 
     // Simulate sexual reproduction: A for autosome.
     initializeSex("A");
-}
-
-//// FUNCTION FOR EVALUATING POPULATION SUPPRESSION WITH RECESSIVE FEMALE STERILITY STYLE SUPPRESSION.
-function (logical)isRecessiveFemaleSterilitySuppressed(o<Individual>$ ind) {
-    // Check both chromosomes for drive and type 2 resistance allele.
-    // These are the only variants that affect suppression.
-    drive_on_1 = ind.genome1.countOfMutationsOfType(m2) == NUM_GRNAS;
-    drive_on_2 = ind.genome2.countOfMutationsOfType(m2) == NUM_GRNAS;
-    res2_on_1 = ind.genome1.countOfMutationsOfType(m4) > 0;
-    res2_on_2 = ind.genome2.countOfMutationsOfType(m4) > 0;
-
-    // Individual cannot reproduce if both chromosomes have either a drive or an r2.
-    if ((drive_on_1 | res2_on_1) & (drive_on_2 | res2_on_2))
-        return T;
-    return F;
-}
-
-//// FUNCTION FOR EVALUATING POPULATION SUPPRESSION WITH HAPLOLETHAL STYLE SUPPRESSION.
-function (logical)isHLSuppressed(o<Individual>$ ind) {
-    // Check both chromosomes for the drive.
-    drive_on_1 = ind.genome1.countOfMutationsOfType(m2) == NUM_GRNAS;
-    drive_on_2 = ind.genome2.countOfMutationsOfType(m2) == NUM_GRNAS;
-
-    // Individual cannot reproduce if both chromosomes have a drive.
-    if (drive_on_1 & drive_on_2)
-        return T;
-    return F;
 }
 
 //// HELPER FUNCTION FOR FORMING A RESISTANCE ALLELE AT A GIVEN LOCUS.
@@ -270,6 +247,19 @@ function (f$)genotypeFitness(o<Individual>$ ind) {
 
     // Return fitness for individual with this genotype.
     return sqrt(c1_value * c2_value);
+}
+
+//// FUNCTION FOR EVALUATING INFERTILITY CAUSED BY SUPRESSION DRIVES.
+function (logical)isInfertile(o<Individual>$ ind) {
+    dr_count = sum(ind.genomes.countOfMutationsOfType(m2) == NUM_GRNAS);
+    r2_count = sum(ind.genomes.countOfMutationsOfType(m4) > 0);
+    if (RECESSIVE_FEMALE_STERILE_SUPPRESSION_DRIVE)
+        if (dr_count + r2_count == 2)
+            return T;
+    if (HAPLOLETHAL_SUPPRESSION_DRIVE)
+        if (dr_count == 2)
+            return T;
+    return F;
 }
 
 //// REPRODUCTION RULES.

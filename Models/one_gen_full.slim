@@ -8,50 +8,64 @@
 // values in the header using an associated Python file.
 
 // This version starts with two individuals:
-// one of whom is a heterozygous female,
-// and generates CAPACITY offspring.
+// one of whom is a heterozygous female by default
+// or male if the MALE_ONLY_DROP parameter is set to true,
+// and generates CAPACITY offspring. Note that some of the 
+// parameters are not used in this model.
 
 initialize() {
-    // Configuration parameters:
+    // Fitness parameters:
     defineConstant("DRIVE_FITNESS_VALUE", 0.9);
-    defineConstant("R2_FITNESS_VALUE", 0.95);
     defineConstant("GENE_DISRUPTION_DRIVE_FITNESS_MULTIPLIER", 0.95);
+    defineConstant("R2_FITNESS_VALUE", 1.0);
 
-    defineConstant("GERMLINE_RESISTANCE_CUT_RATE", 0.02);
-    defineConstant("HOMING_PHASE_CUT_RATE", 0.98);
-    defineConstant("BASELINE_HOMING_SUCCESS_RATE", 0.95);
-    defineConstant("HOMING_EDGE_EFFECT", 0.055);
-    defineConstant("BASE_TOTAL_FAILURE_AVOIDANCE_RATE", 0.9);
-    defineConstant("TOTAL_FAILURE_PER_OFFSET_PENALTY", 0.1);
-    defineConstant("TOTAL_FAILURE_R1_RATE", 0.001);
-    defineConstant("LATE_GERMLINE_RESISTANCE_CUT_RATE", 0.90);
-    defineConstant("EMBRYO_RESISTANCE_CUT_RATE", 0.05);
-    defineConstant("NUM_GRNAS", 4);
-    defineConstant("NUM_CUT_PHASES", 3);
-    defineConstant("GRNA_ACTIVITY_VARIATION", 0.2);
-    defineConstant("GRNA_SATURATION_SIMULATED", T);
-    defineConstant("GLOBAL_SATURATION_FACTOR", 1.5); // Has no effect when set to 2.
-    defineConstant("R1_OCCURRENCE_RATE", 0.1);
-
+    // Drive type:
     defineConstant("HOMING_DRIVE", T);
-    defineConstant("HAPLOLETHAL", F);
-    defineConstant("RECESSIVE_LETHAL", F);
+    defineConstant("HAPLOLETHAL_DRIVE", F);
+    defineConstant("RECESSIVE_LETHAL_DRIVE", F);
     defineConstant("GENE_DISRUPTION_DRIVE", F);
     defineConstant("RECESSIVE_FEMALE_STERILE_SUPPRESSION_DRIVE", F);
     defineConstant("HAPLOLETHAL_SUPPRESSION_DRIVE", F);
-    defineConstant("TADS_MODIFICATION", F); // r2/r2 males are sterile; nonhoming.
-    defineConstant("TADS_AUTOSOMAL_SUPPRESSION", F); // r2/r2 males AND d/d males are sterile; nonhoming.
+    defineConstant("MODIFICATION_TADS_DRIVE", F);  // r2/r2 males are sterile; nonhoming.
+    defineConstant("TADS_AUTOSOMAL_SUPPRESSION_DRIVE", F);  // r2/r2 males AND d/d males are sterile; nonhoming.
 
+    // Resistance phase parameters:
+    defineConstant("NUM_CUT_PHASES", 3);
+    defineConstant("GERMLINE_RESISTANCE_CUT_RATE", 0.02);
+    defineConstant("LATE_GERMLINE_RESISTANCE_CUT_RATE", 0.9);
+    defineConstant("EMBRYO_RESISTANCE_CUT_RATE", 0.05);
+    defineConstant("HET_MOTHER_CAS_INHERITANCE", 1.83);
+    defineConstant("R1_OCCURRENCE_RATE", 0.1);
+
+    // HDR phase parameters:
+    defineConstant("HOMING_PHASE_CUT_RATE", 0.98);
+    defineConstant("HOMING_EDGE_EFFECT", 0.055);
+    defineConstant("BASELINE_HOMING_SUCCESS_RATE", 0.95);
+    defineConstant("PARTIAL_HDR_RATE", 0.1);
+    defineConstant("PER_OFFSET_PARTIAL_HDR_RATE_INCREASE", 0.1);
+    defineConstant("PARTIAL_HDR_R1_RATE", 0.001);
+
+    // General drive parameters:
+    defineConstant("NUM_GRNAS", 2);
+    defineConstant("GRNA_ACTIVITY_VARIATION", 0.2);
+    defineConstant("GLOBAL_SATURATION_FACTOR", 1.5); // Has no effect when set to 2.
     defineConstant("X_LINKED_DRIVE", F);
     defineConstant("MALE_ONLY_PROMOTER", F);
+    defineConstant("GRNA_SATURATION_SIMULATED", T);
 
+    // Ecology and drop parameters:
+    defineConstant("CAPACITY", 100000);
+    defineConstant("DROP_SIZE", 1000);
+    defineConstant("MAX_ATTEMPTS_TO_FIND_SUITABLE_MATE", 10);
+    defineConstant("LOW_DENSITY_GROWTH_RATE", 10);
+    defineConstant("MAX_OFFSPRING", 50);
+    defineConstant("RATE_FEMALES_SURVIVE", 0.0);  // For partially overlapping generations.
     defineConstant("MALE_ONLY_DROP", F);
     defineConstant("FEMALE_ONLY_DROP", F);
-
-    defineConstant("CAPACITY", 100000);
-
+    defineConstant("HETEROZYGOUS_DROP", T);
     // End config params.
 
+    // Calculate activity step between each gRNA.
     if (NUM_GRNAS == 1)
         defineConstant("GRNA_ACTIVITY_STEP", 0);
     else
@@ -86,33 +100,6 @@ initialize() {
 
     // Simulate sexual reproduction: A for autosome.
     initializeSex("A");
-}
-
-//// FUNCTION FOR EVALUATING POPULATION SUPPRESSION WITH RECESSIVE FEMALE STERILITY STYLE SUPPRESSION.
-function (logical)isRecessiveFemaleSterilitySuppressed(o<Individual>$ ind) {
-    // Check both chromosomes for drive and type 2 resistance allele.
-    // These are the only variants that affect suppression.
-    drive_on_1 = ind.genome1.countOfMutationsOfType(m2) == NUM_GRNAS;
-    drive_on_2 = ind.genome2.countOfMutationsOfType(m2) == NUM_GRNAS;
-    res2_on_1 = ind.genome1.countOfMutationsOfType(m4) > 0;
-    res2_on_2 = ind.genome2.countOfMutationsOfType(m4) > 0;
-
-    // Individual cannot reproduce if both chromosomes have either a drive or an r2.
-    if ((drive_on_1 | res2_on_1) & (drive_on_2 | res2_on_2))
-        return T;
-    return F;
-}
-
-//// FUNCTION FOR EVALUATING POPULATION SUPPRESSION WITH HAPLOLETHAL STYLE SUPPRESSION.
-function (logical)isHLSuppressed(o<Individual>$ ind) {
-    // Check both chromosomes for the drive.
-    drive_on_1 = ind.genome1.countOfMutationsOfType(m2) == NUM_GRNAS;
-    drive_on_2 = ind.genome2.countOfMutationsOfType(m2) == NUM_GRNAS;
-
-    // Individual cannot reproduce if both chromosomes have a drive.
-    if (drive_on_1 & drive_on_2)
-        return T;
-    return F;
 }
 
 //// HELPER FUNCTION FOR FORMING A RESISTANCE ALLELE AT A GIVEN LOCUS.
@@ -173,7 +160,7 @@ function (void)embryo(o<Genome>$ child_chromosome_1, o<Genome>$ child_chromosome
     // Determine the per phase cut rate.
     if (HOMING_DRIVE & sum(mother.genomes.countOfMutationsOfType(m1) == NUM_GRNAS) == 1)
         // Special case for homing drive individual that is dr/wt based on experimental data.
-        mother_drive_count = 1.83;
+        mother_drive_count = HET_MOTHER_CAS_INHERITANCE;
     grna_factor = 1;
     if (GRNA_SATURATION_SIMULATED)
         grna_factor = NUM_GRNAS;
@@ -308,12 +295,11 @@ function (void)hdr(o<Genome>$ chromosome, o<Individual>$ parent) {
         else {
             // A small percentage of of individuals repair the chromosome with partial HDR,
             // resulting in the entire section of the chromosome becoming a resistance allele.
-            total_failure_avoidance_rate = BASE_TOTAL_FAILURE_AVOIDANCE_RATE * (1 - TOTAL_FAILURE_PER_OFFSET_PENALTY * adjusted_left_index) * (1 - TOTAL_FAILURE_PER_OFFSET_PENALTY * adjusted_right_index);
-
-            if (runif(1) > total_failure_avoidance_rate) {
+            final_partial_hdr_rate = 1 - (1 - PARTIAL_HDR_RATE) * (1 - PER_OFFSET_PARTIAL_HDR_RATE_INCREASE * adjusted_left_index) * (1 - PER_OFFSET_PARTIAL_HDR_RATE_INCREASE * adjusted_right_index);
+            if (runif(1) < final_partial_hdr_rate) {
                 // Rarely, partial HDR results in a total R1 allele, though only in haplolethal or recessive lethal drives:
-                total_r1_rate = TOTAL_FAILURE_R1_RATE * (1 + adjusted_right_index - adjusted_left_index);
-                if (runif(1) < total_r1_rate & (HAPLOLETHAL | RECESSIVE_LETHAL))
+                total_r1_rate = PARTIAL_HDR_R1_RATE * (1 + adjusted_right_index - adjusted_left_index);
+                if (runif(1) < total_r1_rate & (HAPLOLETHAL_DRIVE | RECESSIVE_LETHAL_DRIVE))
                     for (i in seqLen(NUM_GRNAS))
                         chromosome.addNewDrawnMutation(m3, i);
                 else
@@ -391,7 +377,7 @@ function (void)copy_genome(o<Genome>$ source, o<Genome>$ destination) {
             embryo(childGenome1, childGenome2, parent1);
     } // End homing block
 
-    if (TADS_MODIFICATION | TADS_AUTOSOMAL_SUPPRESSION) {
+    if (MODIFICATION_TADS_DRIVE | TADS_AUTOSOMAL_SUPPRESSION_DRIVE) {
         // Apply germline resistance
         if (!MALE_ONLY_PROMOTER)
             germline(childGenome1, parent1, GERMLINE_RESISTANCE_CUT_RATE);
@@ -431,7 +417,7 @@ function (void)copy_genome(o<Genome>$ source, o<Genome>$ destination) {
             embryo(childGenome1, childGenome2, parent1);
     } // End TADS block
 
-    if (!HOMING_DRIVE & !TADS_MODIFICATION & !TADS_AUTOSOMAL_SUPPRESSION) {
+    if (!HOMING_DRIVE & !MODIFICATION_TADS_DRIVE & !TADS_AUTOSOMAL_SUPPRESSION_DRIVE) {
         // Apply effects that happen in the germline.
         if (!MALE_ONLY_PROMOTER)
             germline(childGenome1, parent1, GERMLINE_RESISTANCE_CUT_RATE);
@@ -454,11 +440,11 @@ function (void)copy_genome(o<Genome>$ source, o<Genome>$ destination) {
     res_2_c_2 = childGenome2.countOfMutationsOfType(m4) > 0;
     // If drive is haplolethal:
     // Offspring not viable if r2 on either chromosome.
-    if (HAPLOLETHAL & (res_2_c_1 | res_2_c_2))
+    if (HAPLOLETHAL_DRIVE & (res_2_c_1 | res_2_c_2))
         return F;
     // If drive is recessive lethal:
     // Offspring not viable if r2 on both chromosomes.
-    if (RECESSIVE_LETHAL & res_2_c_1 & res_2_c_2)
+    if (RECESSIVE_LETHAL_DRIVE & res_2_c_1 & res_2_c_2)
         return F;
 
     return T;
